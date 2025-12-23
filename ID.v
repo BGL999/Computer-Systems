@@ -1,0 +1,322 @@
+// ID.v
+`include "lib/defines.vh"
+module ID(
+    input wire clk,
+    input wire rst,
+    input wire [`StallBus-1:0] stall,
+    
+    output wire stallreq,
+
+    input wire [`IF_TO_ID_WD-1:0] if_to_id_bus,
+
+    input wire [31:0] inst_sram_rdata,
+
+    input wire [`WB_TO_RF_WD-1:0] wb_to_rf_bus,
+    
+    // 数据转发输入
+    input wire ex_we_i,
+    input wire [4:0] ex_waddr_i,
+    input wire [31:0] ex_wdata_i,
+    
+    input wire mem_we_i,
+    input wire [4:0] mem_waddr_i,
+    input wire [31:0] mem_wdata_i,
+
+    output wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,
+
+    output wire [`BR_WD-1:0] br_bus 
+);
+
+    reg [`IF_TO_ID_WD-1:0] if_to_id_bus_r;
+    wire [31:0] inst;
+    wire [31:0] id_pc;
+    wire ce;
+
+    wire wb_rf_we;
+    wire [4:0] wb_rf_waddr;
+    wire [31:0] wb_rf_wdata;
+
+    always @ (posedge clk) begin
+        if (rst) begin
+            if_to_id_bus_r <= `IF_TO_ID_WD'b0;        
+        end
+        else if (stall[1]==`Stop && stall[2]==`NoStop) begin
+            if_to_id_bus_r <= `IF_TO_ID_WD'b0;
+        end
+        else if (stall[1]==`NoStop) begin
+            if_to_id_bus_r <= if_to_id_bus;
+        end
+    end
+    
+    assign inst = inst_sram_rdata;
+    assign {
+        ce,
+        id_pc
+    } = if_to_id_bus_r;
+    assign {
+        wb_rf_we,
+        wb_rf_waddr,
+        wb_rf_wdata
+    } = wb_to_rf_bus;
+
+    // 指令译码
+    wire [5:0] opcode;
+    wire [4:0] rs, rt, rd, sa;
+    wire [5:0] func;
+    wire [15:0] imm;
+    wire [25:0] instr_index;
+    wire [19:0] code;
+    wire [4:0] base;
+    wire [15:0] offset;
+    wire [2:0] sel;
+
+    assign opcode = inst[31:26];
+    assign rs = inst[25:21];
+    assign rt = inst[20:16];
+    assign rd = inst[15:11];
+    assign sa = inst[10:6];
+    assign func = inst[5:0];
+    assign imm = inst[15:0];
+    assign instr_index = inst[25:0];
+    assign code = inst[25:6];
+    assign base = inst[25:21];
+    assign offset = inst[15:0];
+    assign sel = inst[2:0];
+
+    // 指令定义
+    wire inst_ori, inst_lui, inst_addiu, inst_beq, inst_bne;
+    wire inst_add, inst_addu, inst_sub, inst_subu;
+    wire inst_slt, inst_sltu, inst_and, inst_or, inst_xor, inst_nor;
+    wire inst_sll, inst_srl, inst_sra;
+    wire inst_jr, inst_jalr, inst_j, inst_jal;
+    wire inst_slti, inst_sltiu, inst_andi, inst_xori;
+    wire inst_mult, inst_multu, inst_div, inst_divu;
+    wire inst_mfhi, inst_mflo, inst_mthi, inst_mtlo;
+    
+    // R-type指令判断
+    wire inst_rtype = (opcode == 6'b000000);
+    assign inst_add  = inst_rtype & (func == 6'b100000);
+    assign inst_addu = inst_rtype & (func == 6'b100001);
+    assign inst_sub  = inst_rtype & (func == 6'b100010);
+    assign inst_subu = inst_rtype & (func == 6'b100011);
+    assign inst_slt  = inst_rtype & (func == 6'b101010);
+    assign inst_sltu = inst_rtype & (func == 6'b101011);
+    assign inst_and  = inst_rtype & (func == 6'b100100);
+    assign inst_or   = inst_rtype & (func == 6'b100101);
+    assign inst_xor  = inst_rtype & (func == 6'b100110);
+    assign inst_nor  = inst_rtype & (func == 6'b100111);
+    assign inst_sll  = inst_rtype & (func == 6'b000000);
+    assign inst_srl  = inst_rtype & (func == 6'b000010);
+    assign inst_sra  = inst_rtype & (func == 6'b000011);
+    assign inst_jr   = inst_rtype & (func == 6'b001000);
+    assign inst_jalr = inst_rtype & (func == 6'b001001);
+    assign inst_mult  = inst_rtype & (func == 6'b011000);
+    assign inst_multu = inst_rtype & (func == 6'b011001);
+    assign inst_div   = inst_rtype & (func == 6'b011010);
+    assign inst_divu  = inst_rtype & (func == 6'b011011);
+    assign inst_mfhi  = inst_rtype & (func == 6'b010000);
+    assign inst_mflo  = inst_rtype & (func == 6'b010010);
+    assign inst_mthi  = inst_rtype & (func == 6'b010001);
+    assign inst_mtlo  = inst_rtype & (func == 6'b010011);
+    
+    // I-type指令
+    assign inst_ori   = (opcode == 6'b001101);
+    assign inst_lui   = (opcode == 6'b001111);
+    assign inst_addiu = (opcode == 6'b001001);
+    assign inst_beq   = (opcode == 6'b000100);
+    assign inst_bne   = (opcode == 6'b000101);
+    assign inst_slti  = (opcode == 6'b001010);
+    assign inst_sltiu = (opcode == 6'b001011);
+    assign inst_andi  = (opcode == 6'b001100);
+    assign inst_xori  = (opcode == 6'b001110);
+    
+    // J-type指令
+    assign inst_j    = (opcode == 6'b000010);
+    assign inst_jal  = (opcode == 6'b000011);
+
+    // 寄存器文件
+    wire [31:0] rdata1_raw, rdata2_raw;
+    wire [31:0] rdata1, rdata2;
+
+    regfile u_regfile(
+        .clk    (clk          ),
+        .raddr1 (rs           ),
+        .rdata1 (rdata1_raw   ),
+        .raddr2 (rt           ),
+        .rdata2 (rdata2_raw   ),
+        .we     (wb_rf_we     ),
+        .waddr  (wb_rf_waddr  ),
+        .wdata  (wb_rf_wdata  )
+    );
+    
+    // 数据转发逻辑
+    always @(*) begin
+        // 转发rs数据（优先级：EX > MEM > WB）
+        if (ex_we_i && ex_waddr_i != 5'b0 && ex_waddr_i == rs) begin
+            rdata1 = ex_wdata_i;
+        end
+        else if (mem_we_i && mem_waddr_i != 5'b0 && mem_waddr_i == rs) begin
+            rdata1 = mem_wdata_i;
+        end
+        else if (wb_rf_we && wb_rf_waddr != 5'b0 && wb_rf_waddr == rs) begin
+            rdata1 = wb_rf_wdata;
+        end
+        else begin
+            rdata1 = rdata1_raw;
+        end
+        
+        // 转发rt数据（优先级：EX > MEM > WB）
+        if (ex_we_i && ex_waddr_i != 5'b0 && ex_waddr_i == rt) begin
+            rdata2 = ex_wdata_i;
+        end
+        else if (mem_we_i && mem_waddr_i != 5'b0 && mem_waddr_i == rt) begin
+            rdata2 = mem_wdata_i;
+        end
+        else if (wb_rf_we && wb_rf_waddr != 5'b0 && wb_rf_waddr == rt) begin
+            rdata2 = wb_rf_wdata;
+        end
+        else begin
+            rdata2 = rdata2_raw;
+        end
+    end
+
+    // ALU源操作数1选择
+    wire [2:0] sel_alu_src1;
+    assign sel_alu_src1[0] = inst_ori | inst_addiu | inst_add | inst_addu | 
+                           inst_sub | inst_subu | inst_slt | inst_sltu |
+                           inst_and | inst_or | inst_xor | inst_nor |
+                           inst_slti | inst_sltiu | inst_andi | inst_xori |
+                           inst_mult | inst_multu | inst_div | inst_divu |
+                           inst_mthi | inst_mtlo;
+    
+    assign sel_alu_src1[1] = inst_jal | inst_jalr;  // PC for link
+    
+    assign sel_alu_src1[2] = inst_sll | inst_srl | inst_sra;  // sa for shift
+
+    // ALU源操作数2选择
+    wire [3:0] sel_alu_src2;
+    assign sel_alu_src2[0] = inst_add | inst_addu | inst_sub | inst_subu |
+                           inst_slt | inst_sltu | inst_and | inst_or |
+                           inst_xor | inst_nor | inst_sll | inst_srl |
+                           inst_sra | inst_mult | inst_multu | 
+                           inst_div | inst_divu | inst_mfhi | inst_mflo |
+                           inst_mthi | inst_mtlo;
+    
+    assign sel_alu_src2[1] = inst_addiu | inst_lui | inst_slti | inst_sltiu |
+                           inst_andi | inst_ori | inst_xori;  // immediate
+    
+    assign sel_alu_src2[2] = inst_jal | inst_jalr;  // 32'd8 for link
+    
+    assign sel_alu_src2[3] = 1'b0;  // zero extended immediate
+
+    // ALU操作控制
+    wire op_add, op_sub, op_slt, op_sltu;
+    wire op_and, op_nor, op_or, op_xor;
+    wire op_sll, op_srl, op_sra, op_lui;
+    
+    assign op_add  = inst_addiu | inst_add | inst_addu;
+    assign op_sub  = inst_sub | inst_subu;
+    assign op_slt  = inst_slt | inst_slti;
+    assign op_sltu = inst_sltu | inst_sltiu;
+    assign op_and  = inst_and | inst_andi;
+    assign op_nor  = inst_nor;
+    assign op_or   = inst_or | inst_ori;
+    assign op_xor  = inst_xor | inst_xori;
+    assign op_sll  = inst_sll;
+    assign op_srl  = inst_srl;
+    assign op_sra  = inst_sra;
+    assign op_lui  = inst_lui;
+
+    wire [11:0] alu_op;
+    assign alu_op = {op_add, op_sub, op_slt, op_sltu,
+                     op_and, op_nor, op_or, op_xor,
+                     op_sll, op_srl, op_sra, op_lui};
+
+    // 访存信号
+    wire data_ram_en = 1'b0;  // 暂不实现访存
+    wire [3:0] data_ram_wen = 4'b0;
+
+    // 寄存器堆写使能
+    wire rf_we;
+    assign rf_we = inst_ori | inst_lui | inst_addiu | inst_add | inst_addu |
+                  inst_sub | inst_subu | inst_slt | inst_sltu | inst_and |
+                  inst_or | inst_xor | inst_nor | inst_sll | inst_srl |
+                  inst_sra | inst_slti | inst_sltiu | inst_andi | inst_xori |
+                  inst_jal | inst_jalr | inst_mfhi | inst_mflo;
+
+    // 寄存器堆目标地址选择
+    wire [2:0] sel_rf_dst;
+    assign sel_rf_dst[0] = inst_add | inst_addu | inst_sub | inst_subu |
+                          inst_slt | inst_sltu | inst_and | inst_or |
+                          inst_xor | inst_nor | inst_sll | inst_srl |
+                          inst_sra | inst_jalr | inst_mfhi | inst_mflo;  // rd
+    
+    assign sel_rf_dst[1] = inst_ori | inst_lui | inst_addiu | inst_slti |
+                          inst_sltiu | inst_andi | inst_xori;  // rt
+    
+    assign sel_rf_dst[2] = inst_jal;  // r31
+
+    wire [4:0] rf_waddr;
+    assign rf_waddr = {5{sel_rf_dst[0]}} & rd 
+                    | {5{sel_rf_dst[1]}} & rt
+                    | {5{sel_rf_dst[2]}} & 5'd31;
+
+    // 写回数据选择
+    wire sel_rf_res = 1'b0;  // 0 from alu, 1 from mem (暂不实现load)
+
+    // ID到EX的总线
+    assign id_to_ex_bus = {
+        id_pc,          // 158:127
+        inst,           // 126:95
+        alu_op,         // 94:83
+        sel_alu_src1,   // 82:80
+        sel_alu_src2,   // 79:76
+        data_ram_en,    // 75
+        data_ram_wen,   // 74:71
+        rf_we,          // 70
+        rf_waddr,       // 69:65
+        sel_rf_res,     // 64
+        rdata1,         // 63:32
+        rdata2          // 31:0
+    };
+
+    // 分支逻辑
+    wire br_e;
+    wire [31:0] br_addr;
+    wire rs_eq_rt;
+    wire rs_ne_rt;
+    wire [31:0] pc_plus_4;
+    wire [31:0] pc_plus_8;
+    
+    assign pc_plus_4 = id_pc + 32'h4;
+    assign pc_plus_8 = id_pc + 32'h8;
+
+    // 使用转发后的数据进行比较
+    assign rs_eq_rt = (rdata1 == rdata2);
+    assign rs_ne_rt = (rdata1 != rdata2);
+
+    // 分支地址计算
+    wire [31:0] branch_target;
+    assign branch_target = pc_plus_4 + {{14{inst[15]}}, inst[15:0], 2'b0};
+    
+    // 跳转地址计算
+    wire [31:0] jump_target;
+    assign jump_target = {pc_plus_4[31:28], instr_index, 2'b0};
+
+    // 分支判断
+    assign br_e = (inst_beq & rs_eq_rt) | (inst_bne & rs_ne_rt) | 
+                  inst_j | inst_jal | inst_jr | inst_jalr;
+    
+    assign br_addr = inst_jr | inst_jalr ? rdata1 :
+                     inst_j | inst_jal ? jump_target :
+                     branch_target;
+
+    assign br_bus = {
+        br_e,
+        br_addr
+    };
+
+    // load-use冒险检测（暂不实现）
+    assign stallreq = 1'b0;
+
+endmodule
