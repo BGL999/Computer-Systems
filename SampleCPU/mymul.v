@@ -1,8 +1,3 @@
-/**
- * @Author:zht、szw
- * @Date: 2021-12-10
- */
-
 `include "lib/defines.vh"
 
 module mymul(
