@@ -2,7 +2,7 @@
 module ID(
     input wire clk,                     // 时钟信号
     input wire rst,                     // 复位信号
-    // input wire flush,                // 刷新信号（注释掉了）
+    // input wire flush,                // 刷新信号
     input wire [`StallBus-1:0] stall,   // 流水线暂停信号
     input wire ex_is_load,              // EX阶段是否为加载指令
     output wire stallreq,               // 请求暂停信号
@@ -129,7 +129,7 @@ module ID(
 
     wire data_ram_en;  // 数据存储器使能信号
     wire [3:0] data_ram_wen;  // 数据存储器写使能信号
-    wire [3:0] data_ram_readen;  // 数据存储器读使能信号//XXX:新增
+    wire [3:0] data_ram_readen;  // 数据存储器读使能信号
     
     wire rf_we;  // 寄存器文件写使能信号
     wire [4:0] rf_waddr;  // 寄存器文件写地址
@@ -137,14 +137,14 @@ module ID(
     wire [2:0] sel_rf_dst;  // 寄存器文件写地址选择信号
 
     wire [31:0] rdata1, rdata2;  // 从寄存器文件读取的数据
-    wire [31:0] rdata11, rdata22;  // 经过旁路处理的寄存器读数据//XXX:新增
+    wire [31:0] rdata11, rdata22;  // 经过旁路处理的寄存器读数据
 
-    wire hi_r,hi_wen,lo_r,lo_wen;  // HI/LO寄存器读写信号//XXX:新增
+    wire hi_r,hi_wen,lo_r,lo_wen;  // HI/LO寄存器读写信号
     wire [31:0] hi_data;  // HI寄存器数据
     wire [31:0] lo_data;  // LO寄存器数据
     wire [31:0] hilo_data;  // HI/LO寄存器数据
 
-    // 从hilo_ex_to_id中提取HI/LO寄存器信号//XXX:新增
+    // 从hilo_ex_to_id中提取HI/LO寄存器信号
     assign {
         hi_wen,         // 65
         lo_wen,         // 64
@@ -152,7 +152,7 @@ module ID(
         lo_data         // 31:0
     } = hilo_ex_to_id;
 
-    assign hi_r = inst_mfhi;  // HI寄存器读使能//XXX:新增
+    assign hi_r = inst_mfhi;  // HI寄存器读使能
     assign lo_r = inst_mflo;  // LO寄存器读使能
 
     // 实例化寄存器文件模块
@@ -164,7 +164,7 @@ module ID(
         .rdata2 (rdata2 ),
         .we     (wb_rf_we     ),
         .waddr  (wb_rf_waddr  ),
-        .wdata  (wb_rf_wdata  ),//XXX:新增
+        .wdata  (wb_rf_wdata  ),
 
         .hi_r      ( hi_r   ),
         .hi_we     (  hi_wen   ),
@@ -250,8 +250,8 @@ module ID(
     	.in  (rt  ),
         .out (rt_d )
     );
-    /*TODO:这里指令数量不够
-    */
+    
+    
     // 判断指令类型
     assign inst_ori     = op_d[6'b00_1101];//或立即数指令
     assign inst_lui     = op_d[6'b00_1111];//加载高位立即数指令
@@ -307,9 +307,7 @@ module ID(
     assign inst_sh      = op_d[6'b10_1001];
     assign inst_lsa     = op_d[6'b01_1100] && func_d[6'b11_0111];
 
-    /*TODO: lby:这一段的操作数选择，有几个操作数始终不选择，有问题
-            例如，分支操作，应该会用到“选择PC作为ALU的第一个操作数”
-    */
+
     // ALU第一个操作数的选择逻辑
     assign sel_alu_src1[0] = inst_sh | inst_sb | inst_lhu | inst_lh | inst_lbu | inst_bgez | inst_srlv | inst_srav | inst_sllv | inst_andi | inst_and | inst_sub | inst_addi | inst_add | inst_sltiu | inst_slti | inst_slt | inst_sltu | inst_sw | inst_nor | inst_xori | inst_xor | inst_ori | inst_addiu | inst_subu | inst_jr | inst_lw | inst_addu | 
                             inst_or   | inst_mflo  |inst_mfhi | inst_lb |inst_lsa;  // 选择rs作为ALU的第一个操作数
@@ -325,9 +323,7 @@ module ID(
     assign sel_alu_src2[2] =inst_jal | inst_bltzal | inst_bgezal |inst_jalr;  // 选择常数8作为ALU的第二个操作数（未使用）
     assign sel_alu_src2[3] =  inst_andi | inst_xori | inst_ori;  // 选择零扩展的立即数作为ALU的第二个操作数
 
-    /*TODO: lby:这一段可以根据指令集参考资料：1，在“判断指令类型”加判断
-                2.然后在此处连上，为选择指令提供在某些条件下的成立
-    */
+
     // ALU操作类型控制信号
     assign op_add =inst_lsa|inst_sh | inst_sb | inst_lhu | inst_lh | inst_lbu |  inst_lb | inst_addi | inst_add | inst_addiu | inst_lw | inst_addu | inst_jal | inst_sw | inst_bltzal |inst_bgezal|inst_jalr;
     assign op_sub =inst_sub | inst_subu;
@@ -348,9 +344,7 @@ module ID(
                      op_sll, op_srl, op_sra, op_lui};
 
 
-    /*TODO: lby: 这一段，在部分指令下，应当给予赋值。
-            例如：如果是ld（Load），那么en为1；如果是store，那么data_ram_wen为1
-    */
+
     // 数据存储器使能和写使能信号（未使用）
     assign data_ram_en =inst_sh | inst_sb | inst_lhu | inst_lh | inst_lbu | inst_lw | inst_sw | inst_lb;
     assign data_ram_wen = inst_sw ? 4'b1111 : 4'b0000;
@@ -375,9 +369,6 @@ module ID(
     | inst_lw | inst_addu | inst_or;
 
 
-    /*TODO：lby：结合上一个todo，结合mem段功能
-            如果是store，需要设定好写到的地址，选择第几个指令的位置
-    */
     // 寄存器文件写地址选择逻辑，判断
     assign sel_rf_dst[0] = inst_lsa|inst_mfhi | inst_mflo | inst_jalr |inst_srl | inst_srlv | inst_srav | inst_sra | inst_sllv | inst_and | inst_sub | inst_add 
     | inst_slt | inst_sltu | inst_nor | inst_xor |
@@ -391,12 +382,8 @@ module ID(
                     | {5{sel_rf_dst[1]}} & rt
                     | {5{sel_rf_dst[2]}} & 32'd31;
 
-    /*TODO：lby：结合上一个todo，结合mem段功能
-            1.传给wb的是ex段的，为一种信号
-            2.传给wb的是mem的如load，为另一种信号
-    */
-    // 寄存器文件写数据选择信号（未使用）//lby：这个gpt加的注释可能不对
-    assign sel_rf_res = 1'b0; //学长的代码在这里没有修改
+
+    assign sel_rf_res = 1'b0; 
 
     // LSA指令处理
     wire [31:0] rdata111;

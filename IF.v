@@ -1,4 +1,4 @@
-`include "lib/defines.vh"  // 引入外部定义文件，通常用于存储常量和宏定义
+`include "lib/defines.vh" 
 
 // IF阶段模块：负责获取指令并决定下一个PC地址
 module IF(

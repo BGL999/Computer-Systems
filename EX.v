@@ -1,9 +1,9 @@
-`include "lib/defines.vh"  // 包含定义文件，提供常量和宏定义
+`include "lib/defines.vh"  
 
 module EX(
     input wire clk,            // 时钟信号
     input wire rst,            // 复位信号,
-    // input wire flush,
+
     input wire [`StallBus-1:0] stall, // 流水线暂停控制信号
 
     input wire [`ID_TO_EX_WD-1:0] id_to_ex_bus, // 从ID阶段传递到EX阶段的数据总线
@@ -15,7 +15,7 @@ module EX(
     output wire [31:0] data_sram_addr, // 数据存储器地址
     output wire [31:0] data_sram_wdata, // 数据存储器写入数据
 
-    //XXX:lby:add
+
     output wire [37:0] ex_to_id,
     output wire stallreq_from_ex,
     output wire ex_is_load,
@@ -29,9 +29,7 @@ module EX(
         if (rst) begin
             id_to_ex_bus_r <= `ID_TO_EX_WD'b0; // 复位时清零
         end
-        // else if (flush) begin
-        //     id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
-        // end
+
         else if (stall[2]==`Stop && stall[3]==`NoStop) begin
             id_to_ex_bus_r <= `ID_TO_EX_WD'b0; // 如果EX阶段暂停但MEM阶段未暂停，清除当前数据
         end
@@ -127,14 +125,7 @@ module EX(
 
 
 
-    /*XXX: 添加内存读取系统
-    这段代码的功能是 控制数据内存的读写操作，具体包括：
 
-        使能信号：控制是否访问数据内存。
-        写使能信号：根据访问类型和地址对齐方式生成正确的写使能信号。
-        地址信号：将执行阶段计算的内存地址传递给数据内存。
-        写入数据：根据写使能信号将寄存器文件中的数据按需对齐并写入内存。
-    */
     assign data_sram_en = data_ram_en;
     assign data_sram_wen =   (data_ram_readen==4'b0101 && ex_result[1:0] == 2'b00 )? 4'b0001 
                             :(data_ram_readen==4'b0101 && ex_result[1:0] == 2'b01 )? 4'b0010
@@ -153,7 +144,7 @@ module EX(
                             :data_sram_wen==4'b1100 ? {rf_rdata2[15:0],16'b0}
                             :32'b0;
 
-    //XXX: 没添加乘法除法
+
     wire hi_wen,lo_wen,inst_mthi,inst_mtlo;
     wire [31:0] hi_data,lo_data;
     assign hi_wen = inst_divu | inst_div | inst_mult | inst_multu | inst_mthi;//hi寄存器 写
@@ -184,28 +175,6 @@ module EX(
     wire inst_mult,inst_multu;
     wire [63:0] mul_result;
 
-    //*************原有的  booth-Wallace 乘法器*************************
-    // wire mul_signed; // 有符号乘法标记
-    // assign mul_signed =   inst_mult  ? 1 
-    //                     : inst_multu ? 0 
-    //                     : 0; 
-    
-    // wire [31:0] mul_data1,mul_data2;
-    // assign mul_data1 = (inst_mult | inst_multu) ? rf_rdata1 : 32'b0;
-    // assign mul_data2 = (inst_mult | inst_multu) ? rf_rdata2 : 32'b0;
-
-    // mul u_mul(
-    // 	.clk        (clk            ),
-    //     .resetn     (~rst           ),
-    //     .mul_signed (mul_signed     ),
-    //     .ina        (mul_opdata1_o      ), // 乘法源操作数1
-    //     .inb        (mul_opdata2_o      ), // 乘法源操作数2
-    //     .result     (mul_result     ) // 乘法结果 64bit
-    // );
-    //*****************************************************************
-
-    //自己家的32周期移位乘法器
-    //******************************************************************
     reg stallreq_for_mul;
     wire mul_ready_i;
     reg signed_mul_o; //是否是有符号乘法
@@ -288,8 +257,7 @@ module EX(
             endcase
         end
     end
-    //******************************************************************
-
+    
     // DIV part 除法单元
     wire [63:0] div_result;
     wire inst_div, inst_divu;         // 是否是除法指令
@@ -382,7 +350,6 @@ module EX(
         end
     end
 
-    // gpt删除了这一行： // mul_result 和 div_result 可以直接使用
     
     
 endmodule

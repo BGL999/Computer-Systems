@@ -9,7 +9,6 @@ module CTRL(
     output reg [`StallBus-1:0] stall  // 流水线各阶段的暂停信号
 );  
 
-    // lby：https://www.cnblogs.com/yangykaifa/p/6823998.html
     // stall[0]：表示取值地址PC是否保持不变，为1表示不变
     // stall[1] 为 1 表示 IF 阶段暂停
     // stall[2] 为 1 表示 ID 阶段暂停
@@ -18,7 +17,7 @@ module CTRL(
     // stall[5] 为 1 表示 WB 阶段暂停
 
     always @ (*) begin
-        //XXX:lby:很好理解，如果ex发起stall，那么ex和之后的都stall
+        //如果ex发起stall，那么ex和之后的都stall
         //                  如果id发起stall，那么mem和之后都stall
         if (rst) begin
             stall <= `StallBus'b0;

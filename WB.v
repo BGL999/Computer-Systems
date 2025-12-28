@@ -15,7 +15,7 @@ module WB(
     output wire [4:0] debug_wb_rf_wnum,  // 调试：WB阶段的寄存器写地址
     output wire [31:0] debug_wb_rf_wdata,  // 调试：WB阶段的寄存器写数据
 
-    //XXX：add
+
     output  wire [37:0] wb_to_id
 );
 
@@ -25,9 +25,7 @@ module WB(
         if (rst) begin
             mem_to_wb_bus_r <= `MEM_TO_WB_WD'b0;
         end
-        // else if (flush) begin
-        //     mem_to_wb_bus_r <= `MEM_TO_WB_WD'b0;
-        // end
+
         else if (stall[4]==`Stop && stall[5]==`NoStop) begin
             mem_to_wb_bus_r <= `MEM_TO_WB_WD'b0;
         end

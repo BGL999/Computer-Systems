@@ -1,9 +1,9 @@
-`include "lib/defines.vh" // 引入定义文件，包含常量和宏定义
+`include "lib/defines.vh" 
 
 module MEM(
     input wire clk,                  // 时钟信号
     input wire rst,                  // 复位信号
-    // input wire flush,             // 流水线清空信号（注释掉，可能未使用）
+
     input wire [`StallBus-1:0] stall, // 流水线暂停信号
 
     input wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus, // 来自EX阶段的数据总线
@@ -11,7 +11,7 @@ module MEM(
 
     output wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus,  // 传递给WB阶段的数据总线
 
-    //XXX：lby：add
+
     output wire [37:0] mem_to_id
 );
 
@@ -22,9 +22,7 @@ module MEM(
         if (rst) begin
             ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0; // 复位时清零
         end
-        // else if (flush) begin
-        //     ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
-        // end
+
         else if (stall[3]==`Stop && stall[4]==`NoStop) begin
             ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0; // 如果MEM阶段暂停，但WB阶段未暂停，清除当前数据
         end
@@ -56,7 +54,6 @@ module MEM(
         ex_result       // 31:0 EX阶段计算结果
     } =  ex_to_mem_bus_r;
 
-    //XXX:lby :添加memresult的赋值
     assign mem_result = data_sram_rdata;
 
     // 根据sel_rf_res信号选择寄存器写入的数据，若为1则使用MEM阶段结果，否则使用EX阶段结果

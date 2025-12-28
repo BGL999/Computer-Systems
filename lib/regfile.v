@@ -1,4 +1,4 @@
-`include "defines.vh"  // 包含定义文件，可能定义了常量或宏
+`include "defines.vh"
 
 module regfile(
     input wire clk,          // 时钟信号，用于同步写操作
@@ -19,7 +19,7 @@ module regfile(
     input wire [31:0] lo_data,
     output wire [31:0] hilo_data
 );
-    //学长家的hilo寄存器
+
     reg  [31:0] hi_o;
     reg  [31:0] lo_o;
     // write

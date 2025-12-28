@@ -30,16 +30,13 @@ module mycpu_core(
     wire [`WB_TO_RF_WD-1:0] wb_to_rf_bus;
     wire [`StallBus-1:0] stall;
 
-    //XXX：lby:新增
     wire [37:0] ex_to_id;
     wire [37:0] mem_to_id;
     wire [37:0] wb_to_id;
-    //XXX：lby:新增
     wire stallreq_from_id;
     wire stallreq_from_ex;
     wire ex_is_load;
     wire [65:0] hilo_ex_to_id;
-    //XXX:lby:自己加的，学长代码没有
     wire stallreq;
 
     IF u_IF(
